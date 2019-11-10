@@ -14,15 +14,21 @@ class Container:
     def __init__(
         self,
         dataloader: torch.utils.data.DataLoader,
-        workdir: str,
+        model_dir: str,
+        output_dir: str,
+        training_epochs: int,
     ):
         self._dataloader = dataloader
-        self._workdir = workdir
+        self._model_dir = model_dir
+        self._output_dir = output_dir
 
-        self.__init_workdirs()
+        self.__make_directories()
         self.__init_devices()
         self.__init_generator()
         self.__init_discriminator()
+
+        self._epoch = 0
+        self._training_epochs = training_epochs
 
         self.hyperparameters = {
             'learning_rate': 0.0002,
@@ -55,12 +61,21 @@ class Container:
 
         self._fixed_noise = torch.randn(
             *(
-                self._dataloader.batch_size,
+                self.batch_size,
                 self._latent_vector_size,
                 1, 1,
             ),
             device=self._first_device,
         )
+
+    @property
+    def __training_fakes_dir(self):
+        return os.path.join(self._output_dir, 'training_fakes')
+
+    def __make_directories(self):
+        os.makedirs(self._model_dir, mode=0o755, exist_ok=True)
+        os.makedirs(self.__training_fakes_dir, mode=0o755, exist_ok=True)
+
     def __init_devices(self):
         self._ngpus = torch.cuda.device_count()
         self._devices = []
@@ -102,19 +117,6 @@ class Container:
                 val    = 0,
             )
 
-    def __init_workdirs(self):
-        subdirs = [
-            'nets/generator',
-            'nets/discriminator',
-            'training_fakes',
-        ]
-
-        for path in subdirs:
-            os.makedirs(
-                os.path.join(self._workdir, path),
-                mode=0o755,
-            )
-
     def __init_generator(self):
         g = Generator(
             feature_map_size = 64,
@@ -124,10 +126,10 @@ class Container:
 
         g.to(self._first_device)
         if self._ngpus > 1:
-            g = nn.DataParallel(g, list(range(self._ngpus)))
+            g = torch.nn.DataParallel(g, list(range(self._ngpus)))
 
         g.apply(Container.__weights_init)
-        
+
         self._generator = g
 
     def __init_discriminator(self):
@@ -144,8 +146,8 @@ class Container:
 
         self._discriminator = d
 
-    def train(self, num_epochs):
-        for epoch in range(num_epochs):
+    def train(self):
+        for self._epoch in range(self._training_epochs):
             for batch_number, batch_data in enumerate(self._dataloader, start=0):
 
                 # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -220,7 +222,7 @@ class Container:
                 # Output training stats
                 if batch_number % 50 == 0:
                     print(
-                        f'[Epoch {epoch} / {num_epochs}] '
+                        f'[Epoch {self._epoch} / {self._training_epochs}] '
                         f'[Batch {batch_number} / {len(self._dataloader)}] '
                         f'[Loss D: {errD.item():.4f}] '
                         f'[Loss G: {errG.item():.4f}] '
@@ -235,31 +237,44 @@ class Container:
                 # Check how the generator is doing by saving its output from fixed_noise
                 if batch_number % 100 == 0:
                     fixed_fakes = self._generator(self._fixed_noise)
-                    
+
                     filename = os.path.join(
-                        self._workdir,
-                        'training_fakes',
-                        f'epoch_{epoch:03d}.png',
+                        self.__training_fakes_dir,
+                        f'epoch_{self._epoch:03d}.png',
                     )
-                    
+
                     torchvision.utils.save_image(
                         fixed_fakes.detach(),
                         filename,
                         normalize=True,
                     )
 
-            # Do checkpointing (saving the state of the nets?)
-            torch.save(
-                self._generator.state_dict(),
-                f'nets/generator/epoch_{epoch:03d}',
-            )
-            torch.save(
-                self._discriminator.state_dict(),
-                f'nets/discriminator/epoch_{epoch:03d}',
-            )
+            self.save()
+
+    def save(self):
+        generator_statefile_name = os.path.join(
+            self._model_dir,
+            f'generator_epoch_{self._epoch:03d}.dat',
+        )
+        torch.save(
+            self._generator.state_dict(),
+            generator_statefile_name,
+        )
+
+        discriminator_statefile_name = os.path.join(
+            self._model_dir,
+            f'discriminator_epoch_{self._epoch:03d}.dat',
+        )
+        torch.save(
+            self._discriminator.state_dict(),
+            discriminator_statefile_name,
+        )
+
+        with open(os.path.join(self._model_dir, 'epoch.txt'), 'w') as f:
+            f.write(f"{self._epoch}\n")
 
     @property
-    def _batch_size(self):
+    def batch_size(self):
         return self._dataloader.batch_size
 
     @property
@@ -280,4 +295,3 @@ class Container:
         )
 
         return self._generator(noise)
-
