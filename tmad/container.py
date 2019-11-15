@@ -3,6 +3,8 @@ from .discriminator import Discriminator
 
 import torch
 import torchvision.utils
+
+import logging
 import os.path
 
 # Outputs that the discriminator should aim for
@@ -18,17 +20,21 @@ class Container:
         output_dir: str,
         training_epochs: int,
     ):
+        self._logger = logging.getLogger('container')
+        self._logger.info('Initialising DCGAN container')
+
         self._dataloader = dataloader
         self._model_dir = model_dir
         self._output_dir = output_dir
 
-        self.__make_directories()
         self.__init_devices()
         self.__init_generator()
         self.__init_discriminator()
 
         self._epoch = 0
         self._training_epochs = training_epochs
+
+        self.load()
 
         self.hyperparameters = {
             'learning_rate': 0.0002,
@@ -78,6 +84,7 @@ class Container:
 
     def __init_devices(self):
         self._ngpus = torch.cuda.device_count()
+        self._logger.info(f'GPUs available: {self._ngpus}')
         self._devices = []
 
         if (self._ngpus == 0):
@@ -118,6 +125,11 @@ class Container:
             )
 
     def __init_generator(self):
+        self._logger.info(
+            'Making Generator with feature_map_size = 64, '
+            'input_size = 100, color_channels = 3'
+        )
+
         g = Generator(
             feature_map_size = 64,
             input_size       = 100,
@@ -133,6 +145,11 @@ class Container:
         self._generator = g
 
     def __init_discriminator(self):
+        self._logger.info(
+            'Making Discriminator with feature_map_size = 64, '
+            'color_channels = 3'
+        )
+
         d = Discriminator(
             feature_map_size = 64,
             color_channels   = 3,
@@ -147,7 +164,7 @@ class Container:
         self._discriminator = d
 
     def train(self):
-        for self._epoch in range(self._training_epochs):
+        for self._epoch in range(self._epoch, self._training_epochs):
             for batch_number, batch_data in enumerate(self._dataloader, start=0):
 
                 # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
@@ -221,7 +238,7 @@ class Container:
 
                 # Output training stats
                 if batch_number % 50 == 0:
-                    print(
+                    self._logger.info(
                         f'[Epoch {self._epoch} / {self._training_epochs}] '
                         f'[Batch {batch_number} / {len(self._dataloader)}] '
                         f'[Loss D: {errD.item():.4f}] '
@@ -242,6 +259,12 @@ class Container:
                         self.__training_fakes_dir,
                         f'epoch_{self._epoch:03d}.png',
                     )
+                    epoch_fakedir = os.path.join(
+                        self.__training_fakes_dir,
+                        f'{self._epoch:03d}',
+                    )
+                    os.makedirs(epoch_fakedir, exist_ok=True)
+                    filename = os.path.join(epoch_fakedir, 'image.png')
 
                     torchvision.utils.save_image(
                         fixed_fakes.detach(),
@@ -252,26 +275,41 @@ class Container:
             self.save()
 
     def save(self):
-        generator_statefile_name = os.path.join(
-            self._model_dir,
-            f'generator_epoch_{self._epoch:03d}.dat',
-        )
+        self._logger.info('Saving model state...')
+
+        epoch_dir = os.path.join(self._model_dir, f'{self._epoch:03d}')
+        os.makedirs(epoch_dir, mode=0o755, exist_ok=True)
+
+        g_statefile = os.path.join(epoch_dir, 'generator.dat')
         torch.save(
             self._generator.state_dict(),
-            generator_statefile_name,
+            g_statefile,
         )
 
-        discriminator_statefile_name = os.path.join(
-            self._model_dir,
-            f'discriminator_epoch_{self._epoch:03d}.dat',
-        )
+        d_statefile = os.path.join(epoch_dir, 'discriminator.dat')
         torch.save(
             self._discriminator.state_dict(),
-            discriminator_statefile_name,
+            d_statefile,
         )
 
-        with open(os.path.join(self._model_dir, 'epoch.txt'), 'w') as f:
-            f.write(f"{self._epoch}\n")
+        self._logger.info(f'Model state saved to {g_statefile}, {d_statefile}')
+
+    def load(self):
+        self._logger.info('Attempting to load model...')
+
+        while True:
+            epoch_dir = os.path.join(self._model_dir, f'{self._epoch:03d}')
+            g_statefile = os.path.join(epoch_dir, 'generator.dat')
+            d_statefile = os.path.join(epoch_dir, 'discriminator.dat')
+
+            if os.path.exists(g_statefile) and os.path.exists(d_statefile):
+                self._generator.load_state_dict(torch.load(g_statefile))
+                self._discriminator.load_state_dict(torch.load(d_statefile))
+                self._logger.info(f'Loaded epoch {self._epoch}')
+                self._epoch += 1
+            else:
+                self._logger.info('Loading complete')
+                break
 
     @property
     def batch_size(self):
