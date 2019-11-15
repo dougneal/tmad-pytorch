@@ -1,6 +1,11 @@
 import torch.nn as nn
 
+import logging
+
+
 class Discriminator(nn.Module):
+    _logger = logging.getLogger('discriminator')
+
     def __init__(self, feature_map_size: int, color_channels: int):
         super(Discriminator, self).__init__()
 
@@ -86,7 +91,7 @@ class Discriminator(nn.Module):
                 in_channels  = self._fmapsize * 8,
                 out_channels = 1,
                 kernel_size  = self._conv_kernel_size,
-                stride       = self._conv_stride,
+                stride       = (1, 1),
                 padding      = 0,
                 bias         = self._conv_bias,
             ),

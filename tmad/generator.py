@@ -1,6 +1,11 @@
 import torch.nn as nn
 
+import logging
+
+
 class Generator(nn.Module):
+    _logger = logging.getLogger('generator')
+
     def __init__(self, feature_map_size: int, input_size: int, color_channels: int):
         super(Generator, self).__init__()
 
@@ -20,7 +25,7 @@ class Generator(nn.Module):
                 in_channels  = self._inputsize,
                 out_channels = (self._fmapsize * 8),
                 kernel_size  = self._conv_kernel_size,
-                stride       = self._conv_stride,
+                stride       = (1, 1),
                 bias         = self._conv_bias,
             ),
             nn.BatchNorm2d(
@@ -36,6 +41,7 @@ class Generator(nn.Module):
                 out_channels = (self._fmapsize * 4),
                 kernel_size  = self._conv_kernel_size,
                 stride       = self._conv_stride,
+                padding      = self._conv_padding,
                 bias         = self._conv_bias,
             ),
             nn.BatchNorm2d(
