@@ -13,6 +13,8 @@ FAKE_LABEL = 0
 
 
 class Container:
+    logger = logging.getLogger('container')
+
     def __init__(
         self,
         dataloader: torch.utils.data.DataLoader,
@@ -20,8 +22,7 @@ class Container:
         output_dir: str,
         training_epochs: int,
     ):
-        self._logger = logging.getLogger('container')
-        self._logger.info('Initialising DCGAN container')
+        Container.logger.info('Initialising DCGAN container')
 
         self._dataloader = dataloader
         self._model_dir = model_dir
@@ -84,7 +85,7 @@ class Container:
 
     def __init_devices(self):
         self._ngpus = torch.cuda.device_count()
-        self._logger.info(f'GPUs available: {self._ngpus}')
+        Container.logger.info(f'GPUs available: {self._ngpus}')
         self._devices = []
 
         if (self._ngpus == 0):
@@ -95,6 +96,7 @@ class Container:
 
     @staticmethod
     def __weights_init(m):
+
         # This seems like a fucking weird-ass way to initialise the weights,
         # but for now I'm just copying the Pytorch tutorial
 
@@ -103,6 +105,10 @@ class Container:
 
         classname = m.__class__.__name__
         if 'Conv' in classname:
+            Container.logger.debug(
+                f'Weights init for Conv: {m.__class__.__name__}'
+            )
+
             # Initialise the weights from a normal distribution (Gaussian)...
             torch.nn.init.normal_(
                 tensor = m.weight.data,
@@ -111,6 +117,10 @@ class Container:
             )
 
         elif 'BatchNorm' in classname:
+            Container.logger.debug(
+                f'Weights init for BatchNorm: {m.__class__.__name__}'
+            )
+
             # Gaussian again for the weights, but this time with a mean of 1.0
             torch.nn.init.normal_(
                 tensor = m.weight.data,
@@ -125,7 +135,7 @@ class Container:
             )
 
     def __init_generator(self):
-        self._logger.info(
+        Container.logger.info(
             'Making Generator with feature_map_size = 64, '
             'input_size = 100, color_channels = 3'
         )
@@ -145,7 +155,7 @@ class Container:
         self._generator = g
 
     def __init_discriminator(self):
-        self._logger.info(
+        Container.logger.info(
             'Making Discriminator with feature_map_size = 64, '
             'color_channels = 3'
         )
@@ -238,7 +248,7 @@ class Container:
 
                 # Output training stats
                 if batch_number % 50 == 0:
-                    self._logger.info(
+                    Container.logger.info(
                         f'[Epoch {self._epoch} / {self._training_epochs}] '
                         f'[Batch {batch_number} / {len(self._dataloader)}] '
                         f'[Loss D: {errD.item():.4f}] '
@@ -275,7 +285,7 @@ class Container:
             self.save()
 
     def save(self):
-        self._logger.info('Saving model state...')
+        Container.logger.info('Saving model state...')
 
         epoch_dir = os.path.join(self._model_dir, f'{self._epoch:03d}')
         os.makedirs(epoch_dir, mode=0o755, exist_ok=True)
@@ -292,10 +302,10 @@ class Container:
             d_statefile,
         )
 
-        self._logger.info(f'Model state saved to {g_statefile}, {d_statefile}')
+        Container.logger.info(f'Model state saved to {g_statefile}, {d_statefile}')
 
     def load(self):
-        self._logger.info('Attempting to load model...')
+        Container.logger.info('Attempting to load model...')
 
         while True:
             epoch_dir = os.path.join(self._model_dir, f'{self._epoch:03d}')
@@ -305,10 +315,10 @@ class Container:
             if os.path.exists(g_statefile) and os.path.exists(d_statefile):
                 self._generator.load_state_dict(torch.load(g_statefile))
                 self._discriminator.load_state_dict(torch.load(d_statefile))
-                self._logger.info(f'Loaded epoch {self._epoch}')
+                Container.logger.info(f'Loaded epoch {self._epoch}')
                 self._epoch += 1
             else:
-                self._logger.info('Loading complete')
+                Container.logger.info('Loading complete')
                 break
 
     @property
