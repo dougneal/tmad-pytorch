@@ -19,7 +19,7 @@ class Generator(nn.Module):
         self._conv_bias = False
 
 
-        self.main = nn.Sequential(
+        self.model = nn.Sequential(
             # Input is Z (latent space vector), going into a convolution
             nn.ConvTranspose2d(
                 in_channels  = self._inputsize,
@@ -99,4 +99,4 @@ class Generator(nn.Module):
         )
 
     def forward(self, input):
-        return self.main(input)
+        return self.model(input)

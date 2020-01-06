@@ -20,7 +20,7 @@ class Discriminator(nn.Module):
         self._lrelu_negative_slope = 0.2
         self._lrelu_inplace = True
 
-        self.main = nn.Sequential(
+        self.model = nn.Sequential(
             # Input is (nchannels) x 64 x 64
             nn.Conv2d(
                 in_channels  = self._nchannels,
@@ -101,4 +101,4 @@ class Discriminator(nn.Module):
         )
 
     def forward(self, input):
-        return self.main(input)
+        return self.model(input)
