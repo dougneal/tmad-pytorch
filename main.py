@@ -27,7 +27,11 @@ def main():
         training_epochs=args.training_epochs,
     )
 
-    container.train()
+    if args.dump_model:
+        container.dump_model()
+
+    else:
+        container.train()
 
 
 def parse_arguments():
@@ -79,6 +83,12 @@ def parse_arguments():
         type=int,
         default=50,
         help='Number of training epochs (default: 50)',
+    )
+
+    parser.add_argument(
+        '--dump-model',
+        required=False,
+        action="store_true",
     )
 
     return parser.parse_args()

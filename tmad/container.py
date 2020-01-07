@@ -173,6 +173,10 @@ class Container:
 
         self._discriminator = d
 
+    def dump_model(self):
+        print(self._generator)
+        print(self._discriminator)
+
     def train(self):
         for self._epoch in range(self._epoch, self._training_epochs):
             for batch_number, batch_data in enumerate(self._dataloader, start=0):
