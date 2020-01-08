@@ -180,113 +180,115 @@ class Container:
     def train(self):
         for self._epoch in range(self._epoch, self._training_epochs):
             for batch_number, batch_data in enumerate(self._dataloader, start=0):
-
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-                ## Train with an all-real batch
-                self._discriminator.zero_grad()
-
-                # batch_data is a list with two items
-                # the first item is a list of length batch_size containing the image
-                # the second item is a list of length batch_size containing zeroes
-                # I don't yet understand why that is, or what the second item is.
-                real_data = batch_data[0].to(self._first_device)
-                batch_size = real_data.size(0)
-
-                label = torch.full(
-                    size       = (batch_size,),
-                    fill_value = REAL_LABEL,
-                    device     = self._first_device,
-                )
-
-                # Forward-pass batch of real images through discriminator
-                output = self._discriminator(real_data).view(-1)
-
-                # Calculate loss on all-real batch
-                errD_real = self._criterion(output, label)
-
-                # Calculate gradients for D in backward pass
-                errD_real.backward()
-
-                D_x = output.mean().item()
-
-
-                ## Train with an all-fake batch
-                fakes = self._generate_fakes(batch_size)
-                label.fill_(FAKE_LABEL)
-
-                # Forward-pass batch of fake images through discriminator
-                output = self._discriminator(fakes.detach()).view(-1)
-
-                errD_fake = self._criterion(output, label)
-
-                # Calculate the gradients for this batch
-                errD_fake.backward()
-                D_G_z1 = output.mean().item()
-
-                # Add the gradients from the all-real and all-fake batches
-                errD = errD_real + errD_fake
-
-                # Update Discriminator network
-                self._discriminator_optimizer.step()
-
-
-                ## (2) Update G network: maximise log(D(G(z)))
-                self._generator.zero_grad()
-
-                # Fake labels are real for generator cost
-                label.fill_(REAL_LABEL)
-
-                # Since we just updated D, run the batch of fakes through it again
-                # Hmm, in the example code this is fakes not fakes.detach() as before?
-                output = self._discriminator(fakes).view(-1)
-
-                # Calculate G's loss based on this output
-                errG = self._criterion(output, label)
-
-                # Calculate gradients for G
-                errG.backward()
-                D_G_z2 = output.mean().item()
-
-                # Update G
-                self._generator_optimizer.step()
-
-                # Output training stats
-                if batch_number % 50 == 0:
-                    Container.logger.info(
-                        f'[Epoch {self._epoch} / {self._training_epochs}] '
-                        f'[Batch {batch_number} / {len(self._dataloader)}] '
-                        f'[Loss D: {errD.item():.4f}] '
-                        f'[Loss G: {errG.item():.4f}] '
-                        f'[D(x): {D_x:.4f}] '
-                        f'[D(G(z)): {D_G_z1:.4f} / {D_G_z2:.4f}]'
-                    )
-
-                # Save losses
-                self.generator_losses.append(errG.item())
-                self.discriminator_losses.append(errD.item())
-
-                # Check how the generator is doing by saving its output from fixed_noise
-                if batch_number % 100 == 0:
-                    fixed_fakes = self._generator(self._fixed_noise)
-
-                    filename = os.path.join(
-                        self.__training_fakes_dir,
-                        f'epoch_{self._epoch:03d}.png',
-                    )
-                    epoch_fakedir = os.path.join(
-                        self.__training_fakes_dir,
-                        f'{self._epoch:03d}',
-                    )
-                    os.makedirs(epoch_fakedir, exist_ok=True)
-                    filename = os.path.join(epoch_fakedir, 'image.png')
-
-                    torchvision.utils.save_image(
-                        fixed_fakes.detach(),
-                        filename,
-                        normalize=True,
-                    )
+                self.__train_batch(batch_number, batch_data)
 
             self.save()
+
+    def __train_batch(self, batch_number, batch_data):
+        # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+        ## Train with an all-real batch
+        self._discriminator.zero_grad()
+
+        # batch_data is a list with two items
+        # the first item is a list of length batch_size containing the image
+        # the second item is a list of length batch_size containing zeroes
+        # I don't yet understand why that is, or what the second item is.
+        real_data = batch_data[0].to(self._first_device)
+        batch_size = real_data.size(0)
+
+        label = torch.full(
+            size       = (batch_size,),
+            fill_value = REAL_LABEL,
+            device     = self._first_device,
+        )
+
+        # Forward-pass batch of real images through discriminator
+        output = self._discriminator(real_data).view(-1)
+
+        # Calculate loss on all-real batch
+        errD_real = self._criterion(output, label)
+
+        # Calculate gradients for D in backward pass
+        errD_real.backward()
+
+        D_x = output.mean().item()
+
+
+        ## Train with an all-fake batch
+        fakes = self._generate_fakes(batch_size)
+        label.fill_(FAKE_LABEL)
+
+        # Forward-pass batch of fake images through discriminator
+        output = self._discriminator(fakes.detach()).view(-1)
+
+        errD_fake = self._criterion(output, label)
+
+        # Calculate the gradients for this batch
+        errD_fake.backward()
+        D_G_z1 = output.mean().item()
+
+        # Add the gradients from the all-real and all-fake batches
+        errD = errD_real + errD_fake
+
+        # Update Discriminator network
+        self._discriminator_optimizer.step()
+
+
+        ## (2) Update G network: maximise log(D(G(z)))
+        self._generator.zero_grad()
+
+        # Fake labels are real for generator cost
+        label.fill_(REAL_LABEL)
+
+        # Since we just updated D, run the batch of fakes through it again
+        # Hmm, in the example code this is fakes not fakes.detach() as before?
+        output = self._discriminator(fakes).view(-1)
+
+        # Calculate G's loss based on this output
+        errG = self._criterion(output, label)
+
+        # Calculate gradients for G
+        errG.backward()
+        D_G_z2 = output.mean().item()
+
+        # Update G
+        self._generator_optimizer.step()
+
+        # Output training stats
+        if batch_number % 50 == 0:
+            Container.logger.info(
+                f'[Epoch {self._epoch} / {self._training_epochs}] '
+                f'[Batch {batch_number} / {len(self._dataloader)}] '
+                f'[Loss D: {errD.item():.4f}] '
+                f'[Loss G: {errG.item():.4f}] '
+                f'[D(x): {D_x:.4f}] '
+                f'[D(G(z)): {D_G_z1:.4f} / {D_G_z2:.4f}]'
+            )
+
+        # Save losses
+        self.generator_losses.append(errG.item())
+        self.discriminator_losses.append(errD.item())
+
+        # Check how the generator is doing by saving its output from fixed_noise
+        if batch_number % 100 == 0:
+            fixed_fakes = self._generator(self._fixed_noise)
+
+            filename = os.path.join(
+                self.__training_fakes_dir,
+                f'epoch_{self._epoch:03d}.png',
+            )
+            epoch_fakedir = os.path.join(
+                self.__training_fakes_dir,
+                f'{self._epoch:03d}',
+            )
+            os.makedirs(epoch_fakedir, exist_ok=True)
+            filename = os.path.join(epoch_fakedir, 'image.png')
+
+            torchvision.utils.save_image(
+                fixed_fakes.detach(),
+                filename,
+                normalize=True,
+            )
 
     def save(self):
         Container.logger.info('Saving model state...')
