@@ -146,10 +146,7 @@ class Container:
             color_channels   = 3,
         )
 
-        g.to(self._first_device)
-        if self._ngpus > 1:
-            g = torch.nn.DataParallel(g, list(range(self._ngpus)))
-
+        g = torch.nn.DataParallel(g)
         g.apply(Container.__weights_init)
 
         self._generator = g
@@ -165,10 +162,7 @@ class Container:
             color_channels   = 3,
         )
 
-        d.to(self._first_device)
-        #if self._ngpu > 1:
-        #    d = nn.DataParallel(d, list(range(self._ngpus)))
-
+        d = torch.nn.DataParallel(d)
         d.apply(Container.__weights_init)
 
         self._discriminator = d
