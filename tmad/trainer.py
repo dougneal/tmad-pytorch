@@ -12,8 +12,8 @@ REAL_LABEL = 1
 FAKE_LABEL = 0
 
 
-class Container:
-    logger = logging.getLogger('container')
+class Trainer:
+    logger = logging.getLogger('trainer')
 
     def __init__(
         self,
@@ -22,7 +22,7 @@ class Container:
         output_dir: str,
         training_epochs: int,
     ):
-        Container.logger.info('Initialising DCGAN container')
+        Trainer.logger.info('Initialising DCGAN trainer')
 
         self._dataloader = dataloader
         self._model_dir = model_dir
@@ -85,7 +85,7 @@ class Container:
 
     def __init_devices(self):
         self._ngpus = torch.cuda.device_count()
-        Container.logger.info(f'GPUs available: {self._ngpus}')
+        Trainer.logger.info(f'GPUs available: {self._ngpus}')
         self._devices = []
 
         if (self._ngpus == 0):
@@ -105,7 +105,7 @@ class Container:
 
         classname = m.__class__.__name__
         if 'Conv' in classname:
-            Container.logger.debug(
+            Trainer.logger.debug(
                 f'Weights init for Conv: {m.__class__.__name__}'
             )
 
@@ -117,7 +117,7 @@ class Container:
             )
 
         elif 'BatchNorm' in classname:
-            Container.logger.debug(
+            Trainer.logger.debug(
                 f'Weights init for BatchNorm: {m.__class__.__name__}'
             )
 
@@ -135,7 +135,7 @@ class Container:
             )
 
     def __init_generator(self):
-        Container.logger.info(
+        Trainer.logger.info(
             'Making Generator with feature_map_size = 64, '
             'input_size = 100, color_channels = 3'
         )
@@ -147,12 +147,12 @@ class Container:
         )
 
         g = torch.nn.DataParallel(g)
-        g.apply(Container.__weights_init)
+        g.apply(Trainer.__weights_init)
 
         self._generator = g
 
     def __init_discriminator(self):
-        Container.logger.info(
+        Trainer.logger.info(
             'Making Discriminator with feature_map_size = 64, '
             'color_channels = 3'
         )
@@ -163,7 +163,7 @@ class Container:
         )
 
         d = torch.nn.DataParallel(d)
-        d.apply(Container.__weights_init)
+        d.apply(Trainer.__weights_init)
 
         self._discriminator = d
 
@@ -250,7 +250,7 @@ class Container:
 
         # Output training stats
         if batch_number % 50 == 0:
-            Container.logger.info(
+            Trainer.logger.info(
                 f'[Epoch {self._epoch} / {self._training_epochs}] '
                 f'[Batch {batch_number} / {len(self._dataloader)}] '
                 f'[Loss D: {errD.item():.4f}] '
@@ -285,7 +285,7 @@ class Container:
             )
 
     def save(self):
-        Container.logger.info('Saving model state...')
+        Trainer.logger.info('Saving model state...')
 
         epoch_dir = os.path.join(self._model_dir, f'{self._epoch:03d}')
         os.makedirs(epoch_dir, mode=0o755, exist_ok=True)
@@ -302,10 +302,10 @@ class Container:
             d_statefile,
         )
 
-        Container.logger.info(f'Model state saved to {g_statefile}, {d_statefile}')
+        Trainer.logger.info(f'Model state saved to {g_statefile}, {d_statefile}')
 
     def load(self):
-        Container.logger.info('Attempting to load model...')
+        Trainer.logger.info('Attempting to load model...')
 
         while True:
             epoch_dir = os.path.join(self._model_dir, f'{self._epoch:03d}')
@@ -315,10 +315,10 @@ class Container:
             if os.path.exists(g_statefile) and os.path.exists(d_statefile):
                 self._generator.load_state_dict(torch.load(g_statefile))
                 self._discriminator.load_state_dict(torch.load(d_statefile))
-                Container.logger.info(f'Loaded epoch {self._epoch}')
+                Trainer.logger.info(f'Loaded epoch {self._epoch}')
                 self._epoch += 1
             else:
-                Container.logger.info('Loading complete')
+                Trainer.logger.info('Loading complete')
                 break
 
     @property

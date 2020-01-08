@@ -5,7 +5,7 @@ import torchvision.datasets
 import torchvision.transforms
 import torch.utils.data
 
-from tmad.container import Container
+from tmad.trainer import Trainer
 
 IMAGE_SIZE = 64
 
@@ -20,7 +20,7 @@ def main():
     dataset = create_imagefolder_dataset(args.training_data)
     dataloader = create_data_loader(dataset, args.batch_size)
 
-    container = Container(
+    trainer = Trainer(
         dataloader=dataloader,
         model_dir=args.model,
         output_dir=args.output,
@@ -28,10 +28,10 @@ def main():
     )
 
     if args.dump_model:
-        container.dump_model()
+        trainer.dump_model()
 
     else:
-        container.train()
+        trainer.train()
 
 
 def parse_arguments():
