@@ -18,8 +18,15 @@ class Generator(nn.Module):
         self._conv_padding = (1, 1)
         self._conv_bias = False
 
+        self.model = nn.Sequential()
+        self.model.add_module('Input Block', self.__input_block())
+        self.model.add_module('Intermediate Block 1', self.__intermediate_block(8, 4))
+        self.model.add_module('Intermediate Block 2', self.__intermediate_block(4, 2))
+        self.model.add_module('Intermediate Block 3', self.__intermediate_block(2, 1))
+        self.model.add_module('Output Block', self.__output_block())
 
-        self.model = nn.Sequential(
+    def __input_block(self):
+        return nn.Sequential(
             # Input is Z (latent space vector), going into a convolution
             nn.ConvTranspose2d(
                 in_channels  = self._inputsize,
@@ -34,56 +41,28 @@ class Generator(nn.Module):
             nn.ReLU(
                 inplace = True
             ),
+        )
 
-            # State Size: (self._fmapsize * 8) x 4 x 4
+    def __intermediate_block(self, in_multiplier, out_multiplier):
+        return nn.Sequential(
             nn.ConvTranspose2d(
-                in_channels  = (self._fmapsize * 8),
-                out_channels = (self._fmapsize * 4),
+                in_channels  = (self._fmapsize * in_multiplier),
+                out_channels = (self._fmapsize * out_multiplier),
                 kernel_size  = self._conv_kernel_size,
                 stride       = self._conv_stride,
                 padding      = self._conv_padding,
                 bias         = self._conv_bias,
             ),
             nn.BatchNorm2d(
-                num_features = (self._fmapsize * 4)
+                num_features = (self._fmapsize * out_multiplier)
             ),
             nn.ReLU(
                 inplace = True
             ),
+        )
 
-            # State Size: (self._fmapsize * 4) x 8 x 8
-            nn.ConvTranspose2d(
-                in_channels  = (self._fmapsize * 4),
-                out_channels = (self._fmapsize * 2),
-                kernel_size  = self._conv_kernel_size,
-                stride       = self._conv_stride,
-                padding      = self._conv_padding,
-                bias         = self._conv_bias,
-            ),
-            nn.BatchNorm2d(
-                num_features = (self._fmapsize * 2)
-            ),
-            nn.ReLU(
-                inplace = True
-            ),
-
-            # State Size: (self._fmapsize * 2) x 16 x 16
-            nn.ConvTranspose2d(
-                in_channels  = (self._fmapsize * 2),
-                out_channels = self._fmapsize,
-                kernel_size  = self._conv_kernel_size,
-                stride       = self._conv_stride,
-                padding      = self._conv_padding,
-                bias         = self._conv_bias,
-            ),
-            nn.BatchNorm2d(
-                num_features = self._fmapsize
-            ),
-            nn.ReLU(
-                inplace = True
-            ),
-
-            # State Size: self._fmapsize x 32 x 32
+    def __output_block(self):
+        return nn.Sequential(
             nn.ConvTranspose2d(
                 in_channels  = self._fmapsize,
                 out_channels = self._nchannels,
@@ -93,9 +72,6 @@ class Generator(nn.Module):
                 bias         = self._conv_bias,
             ),
             nn.Tanh(),
-            
-            # State Size: (self._nchannels) x 64 x 64
-            # Output is the fake image
         )
 
     def forward(self, input):
