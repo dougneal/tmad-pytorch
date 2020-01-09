@@ -140,7 +140,10 @@ def create_data_loader(
         dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=1,
+        # Don't spawn multiple loader processes.
+        # Do the loading in CPU-land, then migrate tensors to the GPUs.
+        num_workers=0,
+        pin_memory=False,
     )
 
 
