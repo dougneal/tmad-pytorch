@@ -94,6 +94,8 @@ class Trainer:
         for i in range(self._ngpus):
             self._devices.append(torch.device(type='cuda', index=i))
 
+        torch.set_default_tensor_type(torch.cuda.FloatTensor)
+
     @staticmethod
     def __weights_init(m):
 
