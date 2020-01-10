@@ -7,8 +7,6 @@ import torch.utils.data
 
 from tmad.trainer import Trainer
 
-IMAGE_SIZE = 64
-
 
 def main():
     args = parse_arguments()
@@ -17,7 +15,7 @@ def main():
     logger = logging.getLogger()
     logger.info('Starting up')
 
-    dataset = create_imagefolder_dataset(args.training_data)
+    dataset = create_imagefolder_dataset(args.training_data, args.image_size)
     dataloader = create_data_loader(dataset, args.batch_size)
 
     trainer = Trainer(
@@ -78,6 +76,15 @@ def parse_arguments():
     )
 
     parser.add_argument(
+        '--image-size',
+        required=False,
+        type=int,
+        default=64,
+        choices=[64],
+        help='Image size (square), both for training input and fake output',
+    )
+
+    parser.add_argument(
         '--training-epochs',
         required=False,
         type=int,
@@ -111,15 +118,15 @@ def configure_logging(level_name):
 
 
 # For now this is just the ImageFolder dataset lifted from the tutorial.
-def create_imagefolder_dataset(datadir: str):
+def create_imagefolder_dataset(datadir: str, image_size: int):
     logger = logging.getLogger()
     logger.info(f'Making torchvision.datasets.ImageFolder for {datadir}')
 
     return torchvision.datasets.ImageFolder(
         root=datadir,
         transform=torchvision.transforms.Compose([
-            torchvision.transforms.Resize(IMAGE_SIZE),
-            torchvision.transforms.CenterCrop(IMAGE_SIZE),
+            torchvision.transforms.Resize(image_size),
+            torchvision.transforms.CenterCrop(image_size),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize(
                 (0.5, 0.5, 0.5),
