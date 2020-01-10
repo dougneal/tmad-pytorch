@@ -4,7 +4,7 @@ import logging
 
 
 class Discriminator(nn.Module):
-    _logger = logging.getLogger('discriminator')
+    logger = logging.getLogger('discriminator')
 
     def __init__(self, feature_map_size: int, color_channels: int):
         super(Discriminator, self).__init__()
@@ -19,6 +19,12 @@ class Discriminator(nn.Module):
 
         self._lrelu_negative_slope = 0.2
         self._lrelu_inplace = True
+
+        Discriminator.logger.info(
+            'Initialising Discriminator with '
+            f'feature_map_size = {feature_map_size}, '
+            f'color_channels = {color_channels}'
+        )
 
         self.model = nn.Sequential()
         self.model.add_module('Input Block', self.__input_block())

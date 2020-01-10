@@ -4,7 +4,7 @@ import logging
 
 
 class Generator(nn.Module):
-    _logger = logging.getLogger('generator')
+    logger = logging.getLogger('generator')
 
     def __init__(self, feature_map_size: int, input_size: int, color_channels: int):
         super(Generator, self).__init__()
@@ -17,6 +17,13 @@ class Generator(nn.Module):
         self._conv_stride = (2, 2)
         self._conv_padding = (1, 1)
         self._conv_bias = False
+
+        Generator.logger.info(
+            f'Initialising Generator with '
+            f'feature_map_size = {feature_map_size}, '
+            f'input_size = {input_size}, '
+            f'color_channels = {color_channels}'
+        )
 
         self.model = nn.Sequential()
         self.model.add_module('Input Block', self.__input_block())

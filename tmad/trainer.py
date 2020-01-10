@@ -22,20 +22,15 @@ class Trainer:
         output_dir: str,
         training_epochs: int,
     ):
-        Trainer.logger.info('Initialising DCGAN trainer')
-
         self._dataloader = dataloader
         self._model_dir = model_dir
         self._output_dir = output_dir
 
-        self.__init_devices()
-        self.__init_generator()
-        self.__init_discriminator()
-
-        self._epoch = 0
+        # TODO make configurable?
+        # I don't know exactly what this signifies atm
+        self._latent_vector_size = 100
+        self._feature_map_size = 64
         self._training_epochs = training_epochs
-
-        self.load()
 
         self.hyperparameters = {
             'learning_rate': 0.0002,
@@ -45,23 +40,23 @@ class Trainer:
             ),
         }
 
-        self._generator_optimizer = torch.optim.Adam(
-            params = self._discriminator.parameters(),
-            lr     = self.hyperparameters['learning_rate'],
-            betas  = self.hyperparameters['adam_beta'],
+        Trainer.logger.info(
+            'Initialising DCGAN trainer with '
+            f'latent_vector_size = {self._latent_vector_size}, '
+            f'feature_map_size = {self._feature_map_size}, '
+            f'training_epochs = {self._training_epochs}, '
+            f'hyperparameters = {self.hyperparameters}'
         )
 
-        self._discriminator_optimizer = torch.optim.Adam(
-            params = self._generator.parameters(),
-            lr     = self.hyperparameters['learning_rate'],
-            betas  = self.hyperparameters['adam_beta'],
-        )
+        self.__init_devices()
+        self.__init_generator()
+        self.__init_discriminator()
+
+        self._epoch = 0
+
+        self.load()
 
         self._criterion = torch.nn.BCELoss()
-
-        # TODO make configurable?
-        # I don't know exactly what this signifies atm
-        self._latent_vector_size = 100
 
         self.generator_losses = []
         self.discriminator_losses = []
@@ -137,14 +132,9 @@ class Trainer:
             )
 
     def __init_generator(self):
-        Trainer.logger.info(
-            'Making Generator with feature_map_size = 64, '
-            'input_size = 100, color_channels = 3'
-        )
-
         g = Generator(
-            feature_map_size = 64,
-            input_size       = 100,
+            feature_map_size = self._feature_map_size,
+            input_size       = self._latent_vector_size,
             color_channels   = 3,
         )
 
@@ -152,15 +142,15 @@ class Trainer:
         g.apply(Trainer.__weights_init)
 
         self._generator = g
-
-    def __init_discriminator(self):
-        Trainer.logger.info(
-            'Making Discriminator with feature_map_size = 64, '
-            'color_channels = 3'
+        self._generator_optimizer = torch.optim.Adam(
+            params = self._generator.parameters(),
+            lr     = self.hyperparameters['learning_rate'],
+            betas  = self.hyperparameters['adam_beta'],
         )
 
+    def __init_discriminator(self):
         d = Discriminator(
-            feature_map_size = 64,
+            feature_map_size = self._feature_map_size,
             color_channels   = 3,
         )
 
@@ -168,6 +158,12 @@ class Trainer:
         d.apply(Trainer.__weights_init)
 
         self._discriminator = d
+        self._discriminator_optimizer = torch.optim.Adam(
+            params = self._discriminator.parameters(),
+            lr     = self.hyperparameters['learning_rate'],
+            betas  = self.hyperparameters['adam_beta'],
+        )
+
 
     def dump_model(self):
         print(self._generator)
