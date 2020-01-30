@@ -209,4 +209,9 @@ class HSTImageDataset(Dataset):
         )
         fits_data = fits.getdata(filename)
 
-        return self.transform(fits_data, subimage_index)
+        return {
+            'src_filename': filename,
+            'file_index': file_index,
+            'subimage_index': subimage_index,
+            'image_data': self.transform(fits_data, subimage_index),
+        }
