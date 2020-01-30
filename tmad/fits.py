@@ -10,6 +10,12 @@ from astropy.visualization import ZScaleInterval
 
 
 class ZMaxInterval(ZScaleInterval):
+    """
+    Astropy doesn't have a ZMaxInterval class, but we can derive it from the
+    ZScaleInterval class pretty trivially. When visualising FITS images with
+    the 'SAOImage ds9' tool, ZMax was found to highlight the detail in the
+    images whilst keeping the background dark.
+    """
     def __init__(self, *args, **kwargs):
         super(ZMaxInterval, self).__init__(*args, **kwargs)
 
@@ -24,6 +30,41 @@ class FitsTransformException(Exception):
 
 
 class TMAD_ACS_WFC_RAW_FITS_Transform:
+    """
+    This transform class is so named because it deals specifically with raw
+    FITS images from the ACS/WFC instrument on the HST.
+
+    This means that we know the image size we're expecting, and can reject any
+    that don't match, as we have found a few anomalies.
+
+    The images come in at 4144x2068. We crop that down to 4096x2048, partly
+    because there are black bands around the edge of the images, and partly
+    because 4096x2048 divides exactly into 8 tiles of 1024x1024, which is our
+    working base image size for training the DCGAN.
+
+    You'll find a few hard-coded values here relevant to the above.
+
+    For potential future scenarios, say, working with images from a different
+    instrument, or a processing level above RAW, where the input image size
+    is different and a different tile-cutting strategy applies, I would suggest
+    copying this class into a new one and tweaking the values.
+
+    There may then be opportunities to refactor common bits out if so inclined.
+
+    Parameters
+    ----------
+    interval_function: callable
+        An instance of ZMaxInterval, or possibly some other interval function,
+        such as one of many available in astropy.visualization.
+    stretch_function: callable
+        An instance of astropy.visualization.LogStretch(). Again, alternative
+        stretch functions are available, but this is what we found to work
+        "best" so far.
+    scale: tuple
+        A 2-tuple containing the target pixel values for (black, white).
+        The output image will be rescaled accordingly. See comments further
+        down.
+    """
     def __init__(
         self,
         interval_function: callable,
@@ -54,7 +95,7 @@ class TMAD_ACS_WFC_RAW_FITS_Transform:
 
     """
     This signals to the Dataset class how many output images are created from
-    a single input image
+    a single input image.
     """
     @property
     def multiplier(self):
@@ -116,6 +157,19 @@ class TMAD_ACS_WFC_RAW_FITS_Transform:
 
         return tiles
 
+    """
+    "Scale" in this context refers to the interval (difference) between the
+    pixel value representing the darkest shade (i.e. black) and the pixel value
+    representing the lightest shade (i.e. white).
+
+    For displaying on a monitor or exporting to familiar image formats like
+    PNG, this range is from 0 to 255.
+
+    FITS images as they come in have a much wider range than this.
+
+    For feeding into the DCGAN for training, the range will be different again
+    (TODO: specify here what that range is - currently unsure)
+    """
     def _rescale(self, image):
         return (image * self._scale_interval) - self.scale[0]
 
