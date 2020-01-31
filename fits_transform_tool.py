@@ -59,7 +59,8 @@ def main():
 def make_output_filename(input_filename, index, output_dir):
     r = re.compile(r'\.fits', re.IGNORECASE)
     basename_in = os.path.basename(input_filename)
-    basename_out = r.sub(f'.{index}.png', basename_in)
+    basename_out = r.sub('', basename_in)
+    basename_out += f'.{index}.png'
     absolute_out = os.path.join(output_dir, basename_out)
     return absolute_out
 

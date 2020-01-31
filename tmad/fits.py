@@ -1,8 +1,12 @@
+import collections
+import hashlib
 import os
 import os.path
 import logging
+import tempfile
 
 import numpy
+import boto3
 
 from torch.utils.data import Dataset
 from astropy.io import fits
@@ -180,10 +184,69 @@ class TMAD_ACS_WFC_RAW_FITS_Transform:
         return (self.scale[1] - self.scale[0])
 
 
+class CachingS3Downloader():
+    def __init__(self, cache_size=4):
+        self._logger = logging.getLogger('CachingS3Downloader')
+        self._directory = tempfile.TemporaryDirectory()
+        self._cache_index = collections.OrderedDict()
+        self._cache_size = cache_size
+        self.__s3 = None
+
+    def get(self, url):
+        local_filename = self._cache_index.get(url)
+        if local_filename is None:
+            local_filename = self._local_filename(url)
+            self._cache_index[url] = local_filename
+            self._download_to_cache(url)
+            if len(self._cache_index) > self._cache_size:
+                self._expire_oldest()
+        else:
+            self._logger.info(f'Serving {url} from local cache')
+
+        return local_filename
+
+    def _local_filename(self, url):
+        return os.path.join(
+            self._directory.name,
+            hashlib.sha256(url.encode('utf-8')).hexdigest(),
+        )
+
+    def _download_to_cache(self, url):
+        local_filename = self._cache_index[url]
+
+        if url[0:5] == 's3://':
+            url = url[5:]
+
+        (bucket, key) = url.split('/', 1)
+
+        self._logger.info(f'Starting download of {url} to {local_filename}')
+        self._s3.download_file(
+            Bucket=bucket,
+            Key=key,
+            Filename=local_filename,
+            ExtraArgs={'RequestPayer': 'requester'},
+        )
+        self._logger.info(f'Finished download of {url} to {local_filename}')
+
+    def _expire_oldest(self):
+        (url, local_file) = self._cache_index.popitem(last=False)
+        self._logger.info(f'Deleting {url} from the cache')
+        os.remove(local_file)
+
+    @property
+    def _s3(self):
+        if self.__s3 is None:
+            self._logger.info('Initialising AWS S3 client')
+            self.__s3 = boto3.client('s3')
+
+        return self.__s3
+
+
 class HSTImageDataset(Dataset):
     def __init__(self, directory: str, transform: callable):
         self.logger = logging.getLogger()
         self.transform = transform
+        self.s3_downloader = CachingS3Downloader()
 
         if os.path.isdir(directory):
             self.fits_files = self._scan_local_directory(directory)
@@ -224,7 +287,7 @@ class HSTImageDataset(Dataset):
         file_index = index // self.transform.multiplier
         subimage_index = index % self.transform.multiplier
 
-        filename = self.fits_files[file_index]
+        filename = self.s3_downloader.get(self.fits_files[file_index])
         fits_data = fits.getdata(filename)
 
         return {
