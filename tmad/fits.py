@@ -144,14 +144,16 @@ class TMAD_ACS_WFC_RAW_FITS_Transform:
         rows = self.cropped_shape[0] // self.tile_shape[0]
         assert (columns * rows) == self.tile_count
 
+        (tile_height, tile_width) = self.tile_shape
+
         for tile_n in range(self.tile_count):
             column = tile_n % columns
             row = tile_n // columns
 
-            left = column * self.tile_shape[1]
-            right = ((column + 1) * self.tile_shape[1]) - 1
-            top = row * self.tile_shape[0]
-            bottom = ((row + 1) * self.tile_shape[0]) - 1
+            left = tile_width * column
+            right = tile_width * (column + 1)
+            top = tile_height * row
+            bottom = tile_height * (row + 1)
 
             tiles.append(image[top:bottom, left:right])
 
