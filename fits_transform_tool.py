@@ -34,9 +34,9 @@ def main():
                 transform(fits_data, index).astype('uint8'),
             )
 
-    elif args.fits_dir:
+    elif args.fits_fileset:
         dataset = tmad.fits.HSTImageDataset(
-            root_dir=args.fits_dir,
+            directory=args.fits_fileset,
             transform=transform,
         )
         for image in dataset:
@@ -78,9 +78,12 @@ def parse_arguments():
     )
 
     input_selection.add_argument(
-        '--fits-dir',
+        '--fits-fileset',
         type=str,
-        help='Directory of FITS files to process',
+        help=(
+            'Either a directory of FITS files, '
+            'or a text file containing a list of URLs'
+        )
     )
 
     parser.add_argument(

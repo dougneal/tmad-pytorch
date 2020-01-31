@@ -181,22 +181,41 @@ class TMAD_ACS_WFC_RAW_FITS_Transform:
 
 
 class HSTImageDataset(Dataset):
-    def __init__(self, root_dir: str, transform: callable):
-        logger = logging.getLogger()
-        self.root_dir = root_dir
+    def __init__(self, directory: str, transform: callable):
+        self.logger = logging.getLogger()
         self.transform = transform
 
-        # Scan for FITS files
-        logger.info(f'Scanning {root_dir} for FITS files')
-        self.fits_files = list(filter(
-            lambda f: f[-5:].lower() == '.fits',
-            os.listdir(self.root_dir),
-        ))
-        logger.info(f'Found {len(self.fits_files)} in {root_dir}')
-        logger.info('Transform {0} has a multiplier of {1}'.format(
+        if os.path.isdir(directory):
+            self.fits_files = self._scan_local_directory(directory)
+
+        elif os.path.isfile(directory):
+            self.fits_files = self._scan_index_file(directory)
+
+        else:
+            raise ValueError(f'{directory} is not a valid directory a file')
+
+        self.logger.info(f'Found {len(self.fits_files)} in {directory}')
+        self.logger.info('Transform {0} has a multiplier of {1}'.format(
             self.transform.__class__.__name__, self.transform.multiplier
         ))
-        logger.info(f'Total dataset size is {self.__len__()} images')
+        self.logger.info(f'Total dataset size is {self.__len__()} images')
+
+    def _scan_local_directory(self, directory):
+        self.logger.info(f'Scanning local folder {directory} for FITS files')
+
+        files = list(filter(
+            lambda f: f[-5:].lower() == '.fits',
+            os.listdir(directory),
+        ))
+        absolute_files = list(map(
+            lambda f: os.path.join(directory, f),
+            files,
+        ))
+        return absolute_files
+
+    def _scan_index_file(self, index_file):
+        self.logger.info(f'Scanning index file {index_file} for FITS files')
+        return open(index_file).read().splitlines()
 
     def __len__(self):
         return len(self.fits_files) * self.transform.multiplier
@@ -205,10 +224,7 @@ class HSTImageDataset(Dataset):
         file_index = index // self.transform.multiplier
         subimage_index = index % self.transform.multiplier
 
-        filename = os.path.join(
-            self.root_dir,
-            self.fits_files[file_index],
-        )
+        filename = self.fits_files[file_index]
         fits_data = fits.getdata(filename)
 
         return {
