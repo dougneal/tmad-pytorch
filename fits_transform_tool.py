@@ -2,13 +2,14 @@ import os
 import argparse
 import re
 import logging
-
-import tmad.fits
-from astropy.io import fits
+import sys
 import astropy.visualization
 import imageio
 
+import tmad.fits
+
 from tmad.logging import configure_logging
+from tmad.fits import HSTImageDataset, HSTS3ImageDataset
 
 
 def main():
@@ -16,44 +17,47 @@ def main():
     configure_logging(args.log_level)
     logger = logging.getLogger()
 
+    dataset = None
+    if args.fits_file:
+        dataset = HSTImageDataset(files=[args.fits_file])
+
+    elif args.local_index_file:
+        dataset = HSTImageDataset.from_index_file(args.local_index_file)
+
+    elif args.fits_dir:
+        dataset = HSTImageDataset.from_directory(args.fits_dir)
+
+    elif args.s3_file_index:
+        dataset = HSTS3ImageDataset(args.s3_file_index)
+
+    else:
+        logger.fatal("Couldn't determine dataset?!")
+        return 1
+
     # Interval and stretch functions could easily be made configurable
-    transform = tmad.fits.TMAD_ACS_WFC_RAW_FITS_Transform(
+    dataset.transform = tmad.fits.TMAD_ACS_WFC_RAW_FITS_Transform(
         interval_function=tmad.fits.ZMaxInterval(),
         stretch_function=astropy.visualization.LogStretch(),
         scale=(0, 255),
     )
 
-    if args.fits_file:
-        fits_data = fits.getdata(args.fits_file)
-        for index in range(transform.multiplier):
-            output_filename = make_output_filename(
-                args.fits_file, index, args.output_dir,
-            )
-            imageio.imwrite(
-                output_filename,
-                transform(fits_data, index).astype('uint8'),
-            )
-
-    elif args.fits_fileset:
-        dataset = tmad.fits.HSTImageDataset(
-            directory=args.fits_fileset,
-            transform=transform,
+    for image in dataset:
+        output_filename = make_output_filename(
+            image['src_filename'],
+            image['subimage_index'],
+            args.output_dir
         )
-        for image in dataset:
-            output_filename = make_output_filename(
-                image['src_filename'],
-                image['subimage_index'],
-                args.output_dir
-            )
-            logger.info('Exporting tile {0} from {1} to {2}'.format(
-                image['subimage_index'],
-                image['src_filename'],
-                output_filename,
-            ))
-            imageio.imwrite(
-                output_filename,
-                image['image_data'].astype('uint8'),
-            )
+        logger.info('Exporting tile {0} from {1} to {2}'.format(
+            image['subimage_index'],
+            image['src_filename'],
+            output_filename,
+        ))
+        imageio.imwrite(
+            output_filename,
+            image['image_data'].astype('uint8'),
+        )
+
+    return 0
 
 
 def make_output_filename(input_filename, index, output_dir):
@@ -70,7 +74,7 @@ def parse_arguments():
         description="FITS Transform Tool"
     )
 
-    input_selection = parser.add_mutually_exclusive_group()
+    input_selection = parser.add_mutually_exclusive_group(required=True)
 
     input_selection.add_argument(
         '--fits-file',
@@ -79,12 +83,21 @@ def parse_arguments():
     )
 
     input_selection.add_argument(
-        '--fits-fileset',
+        '--local-index-file',
         type=str,
-        help=(
-            'Either a directory of FITS files, '
-            'or a text file containing a list of URLs'
-        )
+        help=('Name of text file containing local paths of FITS files'),
+    )
+
+    input_selection.add_argument(
+        '--fits-dir',
+        type=str,
+        help=('A local directory containing FITS files'),
+    )
+
+    input_selection.add_argument(
+        '--s3-file-index',
+        type=str,
+        help=('Name of text file containing S3 URLs of FITS files'),
     )
 
     parser.add_argument(
@@ -108,4 +121,4 @@ def parse_arguments():
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

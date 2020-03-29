@@ -12,6 +12,8 @@ from torch.utils.data import Dataset
 from astropy.io import fits
 from astropy.visualization import ZScaleInterval
 
+from typing import List
+
 
 class ZMaxInterval(ZScaleInterval):
     """
@@ -243,28 +245,18 @@ class CachingS3Downloader():
 
 
 class HSTImageDataset(Dataset):
-    def __init__(self, directory: str, transform: callable):
-        self.logger = logging.getLogger()
-        self.transform = transform
-        self.s3_downloader = CachingS3Downloader()
+    @classmethod
+    def from_index_file(cls, index_file: str):
+        logger = logging.getLogger()
+        logger.info(f'Scanning index file {index_file} for FITS files')
+        filenames = open(index_file).read().splitlines()
+        logger.info(f'Found {len(filenames)} FITS files in {index_file}')
+        return cls(filenames)
 
-        if os.path.isdir(directory):
-            self.fits_files = self._scan_local_directory(directory)
-
-        elif os.path.isfile(directory):
-            self.fits_files = self._scan_index_file(directory)
-
-        else:
-            raise ValueError(f'{directory} is not a valid directory a file')
-
-        self.logger.info(f'Found {len(self.fits_files)} in {directory}')
-        self.logger.info('Transform {0} has a multiplier of {1}'.format(
-            self.transform.__class__.__name__, self.transform.multiplier
-        ))
-        self.logger.info(f'Total dataset size is {self.__len__()} images')
-
-    def _scan_local_directory(self, directory):
-        self.logger.info(f'Scanning local folder {directory} for FITS files')
+    @classmethod
+    def from_directory(cls, directory: str):
+        logger = logging.getLogger()
+        logger.info(f'Scanning local folder {directory} for FITS files')
 
         files = list(filter(
             lambda f: f[-5:].lower() == '.fits',
@@ -274,11 +266,25 @@ class HSTImageDataset(Dataset):
             lambda f: os.path.join(directory, f),
             files,
         ))
-        return absolute_files
+        logger.info(f'Found {len(absolute_files)} FITS files in {directory}')
+        return cls(absolute_files)
 
-    def _scan_index_file(self, index_file):
-        self.logger.info(f'Scanning index file {index_file} for FITS files')
-        return open(index_file).read().splitlines()
+    def __init__(self, files: List[str]):
+        self.logger = logging.getLogger()
+        self.fits_files = files
+        self._transform = None
+
+    @property
+    def transform(self):
+        return self._transform
+
+    @transform.setter
+    def transform(self, transform: callable):
+        self._transform = transform
+        self.logger.info('Transform {0} has a multiplier of {1}'.format(
+            self._transform.__class__.__name__, self._transform.multiplier
+        ))
+        self.logger.info(f'Total dataset size is {self.__len__()} images')
 
     def __len__(self):
         return len(self.fits_files) * self.transform.multiplier
@@ -286,13 +292,32 @@ class HSTImageDataset(Dataset):
     def __getitem__(self, index):
         file_index = index // self.transform.multiplier
         subimage_index = index % self.transform.multiplier
+        filename = self.fits_files[file_index]
+        subimage = self._extract_subimage(filename, subimage_index)
+        subimage['file_index'] = index
+        return subimage
 
-        filename = self.s3_downloader.get(self.fits_files[file_index])
+    def _extract_subimage(self, filename, subimage_index):
         fits_data = fits.getdata(filename)
+        image_data = self.transform(fits_data, subimage_index)
 
         return {
             'src_filename': filename,
-            'file_index': file_index,
             'subimage_index': subimage_index,
-            'image_data': self.transform(fits_data, subimage_index),
+            'image_data': image_data,
         }
+
+
+class HSTS3ImageDataset(HSTImageDataset):
+    def __init__(self, index: str):
+        super(index)
+        self.s3_downloader = CachingS3Downloader()
+
+    def __getitem__(self, index):
+        file_index = index // self.transform.multiplier
+        subimage_index = index % self.transform.multiplier
+        s3_url = self.fits_files[file_index]
+        filename = self.s3_downloader.get(s3_url)
+        subimage = self._extract_subimage(filename, subimage_index)
+        subimage['file_index'] = index
+        return subimage
