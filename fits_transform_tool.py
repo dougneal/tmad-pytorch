@@ -4,12 +4,12 @@ import re
 import logging
 import sys
 import astropy.visualization
-import imageio
 
 import tmad.fits
 
 from tmad.logging import configure_logging
 from tmad.fits import HSTImageDataset, HSTS3ImageDataset
+from tmad.cloudio import LocalFilesystemSaver, GoogleDriveUploader
 
 
 def main():
@@ -41,21 +41,19 @@ def main():
         scale=(0, 255),
     )
 
+    saver = None
+    if args.output_dir is not None:
+        saver = LocalFilesystemSaver(args.output_dir)
+
+    elif args.google_drive is not None:
+        saver = GoogleDriveUploader(args.google_drive)
+
+    else:
+        logger.fatal("Couldn't determine output method")
+        return 1
+
     for image in dataset:
-        output_filename = make_output_filename(
-            image['src_filename'],
-            image['subimage_index'],
-            args.output_dir
-        )
-        logger.info('Exporting tile {0} from {1} to {2}'.format(
-            image['subimage_index'],
-            image['src_filename'],
-            output_filename,
-        ))
-        imageio.imwrite(
-            output_filename,
-            image['image_data'].astype('uint8'),
-        )
+        saver(image)
 
     return 0
 
@@ -100,12 +98,21 @@ def parse_arguments():
         help=('Name of text file containing S3 URLs of FITS files'),
     )
 
-    parser.add_argument(
+    output_selection = parser.add_mutually_exclusive_group(required=True)
+
+    output_selection.add_argument(
         '--output-dir',
-        required=False,
         type=str,
-        default=os.curdir,
         help='Local folder to write images to (default: current directory)',
+    )
+
+    output_selection.add_argument(
+        '--google-drive',
+        type=str,
+        help=(
+            'Google Drive folder to write images to. '
+            'Specify as the folder ID, not the name.'
+        ),
     )
 
     parser.add_argument(
