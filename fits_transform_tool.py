@@ -17,18 +17,21 @@ def main():
     configure_logging(args.log_level)
     logger = logging.getLogger()
 
-    dataset = None
-    if args.fits_file:
-        dataset = HSTImageDataset(files=[args.fits_file])
+    if args.s3:
+        dataset_class = HSTS3ImageDataset
+    else:
+        dataset_class = HSTImageDataset
 
-    elif args.local_index_file:
-        dataset = HSTImageDataset.from_index_file(args.local_index_file)
+    dataset = None
+
+    if args.fits_file:
+        dataset = dataset_class(files=[args.fits_file])
+
+    elif args.index_file:
+        dataset = dataset_class.from_index_file(args.index_file)
 
     elif args.fits_dir:
-        dataset = HSTImageDataset.from_directory(args.fits_dir)
-
-    elif args.s3_file_index:
-        dataset = HSTS3ImageDataset(args.s3_file_index)
+        dataset = dataset_class.from_directory(args.fits_dir)
 
     else:
         logger.fatal("Couldn't determine dataset?!")
@@ -81,9 +84,9 @@ def parse_arguments():
     )
 
     input_selection.add_argument(
-        '--local-index-file',
+        '--index-file',
         type=str,
-        help=('Name of text file containing local paths of FITS files'),
+        help=('Name of text file containing paths of FITS files'),
     )
 
     input_selection.add_argument(
@@ -92,10 +95,10 @@ def parse_arguments():
         help=('A local directory containing FITS files'),
     )
 
-    input_selection.add_argument(
-        '--s3-file-index',
-        type=str,
-        help=('Name of text file containing S3 URLs of FITS files'),
+    parser.add_argument(
+        '--s3',
+        action='store_true',
+        help=('Load files from S3'),
     )
 
     output_selection = parser.add_mutually_exclusive_group(required=True)

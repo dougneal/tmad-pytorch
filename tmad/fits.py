@@ -255,6 +255,9 @@ class HSTImageDataset(Dataset):
 
     @classmethod
     def from_directory(cls, directory: str):
+        if cls == HSTS3ImageDataset:
+            raise Exception("from_directory not valid for HSTS3ImageDataset")
+
         logger = logging.getLogger()
         logger.info(f'Scanning local folder {directory} for FITS files')
 
@@ -309,8 +312,8 @@ class HSTImageDataset(Dataset):
 
 
 class HSTS3ImageDataset(HSTImageDataset):
-    def __init__(self, index: str):
-        super(index)
+    def __init__(self, files: List[str]):
+        super().__init__(files)
         self.s3_downloader = CachingS3Downloader()
 
     def __getitem__(self, index):
