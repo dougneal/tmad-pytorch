@@ -3,6 +3,7 @@ import imageio
 import logging
 import os
 import re
+import sys
 import tempfile
 
 from pydrive2.auth import GoogleAuth
@@ -49,10 +50,13 @@ class GoogleDriveUploader(ImageSaver):
         self._tmpdir = tempfile.TemporaryDirectory()
         self.logger.info(f'Temporary directory: {self._tmpdir}')
 
-        # FIXME: probably not appropriate in Colab context?
         self.logger.info('Authenticating to Google Drive')
         self._gauth = GoogleAuth()
-        self._gauth.LocalWebserverAuth()
+
+        if 'google.colab' in sys.modules:
+            self.__colab_auth()
+        else:
+            self._gauth.LocalWebserverAuth()
 
         self._drive = GoogleDrive(self._gauth)
         self._file_creation_params = {
@@ -60,6 +64,12 @@ class GoogleDriveUploader(ImageSaver):
                 'id': folder_id,
             }],
         }
+
+    def __colab_auth(self):
+        from google.colab import auth
+        from oauth2client.client import GoogleCredentials
+        auth.authenticate_user()
+        self._gauth.credentials = GoogleCredentials.get_application_default()
 
     def __make_temp_filename(self, image) -> str:
         image_hash = hashlib.sha256(image['image_data']).hexdigest()
