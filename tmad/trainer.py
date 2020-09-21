@@ -192,14 +192,14 @@ class Trainer:
             size       = (batch_size,),
             fill_value = REAL_LABEL,
             device     = self._first_device,
-            dtype      = torch.long,
+            dtype      = torch.float,
         )
 
         # Forward-pass batch of real images through discriminator
         output = self._discriminator(real_data).view(-1)
 
         # Calculate loss on all-real batch
-        errD_real = self._criterion(output, label)
+        errD_real = self._criterion(output.float(), label)
 
         # Calculate gradients for D in backward pass
         errD_real.backward()
@@ -214,7 +214,7 @@ class Trainer:
         # Forward-pass batch of fake images through discriminator
         output = self._discriminator(fakes.detach()).view(-1)
 
-        errD_fake = self._criterion(output, label)
+        errD_fake = self._criterion(output.float(), label)
 
         # Calculate the gradients for this batch
         errD_fake.backward()
