@@ -192,6 +192,7 @@ class Trainer:
             size       = (batch_size,),
             fill_value = REAL_LABEL,
             device     = self._first_device,
+            dtype      = torch.long,
         )
 
         # Forward-pass batch of real images through discriminator
